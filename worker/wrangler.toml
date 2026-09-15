@@ -1,0 +1,11 @@
+name = "horus-core"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+ALLOWED_USER_IDS = "8933796687"
+VOICE_DEFAULT = "off"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "23871018853345a4a56956b2b836542c"
