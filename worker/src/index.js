@@ -31,7 +31,8 @@ async function liveWeather(city) {
 }
 
 async function liveWiki(topic) {
-  const r = await fetch(`https://ar.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`);
+  const title = topic.trim().replace(/\s+/g, "_");
+  const r = await fetch(`https://ar.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
   if (!r.ok) return null;
   const j = await r.json();
   if (!j.extract) return null;
