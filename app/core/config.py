@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     telegram_allowed_user_ids: str = ""
     openai_api_key: str = ""
     groq_api_key: str = ""
+    gemini_api_key: str = ""
+    openrouter_api_key: str = ""
+    paid_llm_mode: str = "off"
     database_url: str = "sqlite+aiosqlite:///./horus.db"
     supabase_url: str = ""
     supabase_key: str = ""
@@ -16,7 +19,7 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
     public_base_url: str = ""
-    cost_monthly_cap_usd: float = 10.0
+    cost_monthly_cap_usd: float = 0.0
 
     @property
     def allowed_users(self) -> set[int]:

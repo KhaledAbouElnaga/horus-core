@@ -4,3 +4,5 @@ __pycache__/
 .env
 *.db
 *.mp3
+backups/
+worker/.wrangler/
