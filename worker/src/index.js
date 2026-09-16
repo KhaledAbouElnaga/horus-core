@@ -1,7 +1,7 @@
 /* HORUS Cloud Core — Cloudflare Worker (built free-first, no card, 24/7).
    Telegram webhook -> allowlist -> commands -> FREE LLM failover -> reply.
    Secrets via Cloudflare only. Never commit or print API keys. */
-const SYSTEM = `أنت حورس، مساعد خالد الشخصي. مصري، مباشر، عملي. مهام بسيطة: نفذ فورًا بلا أسئلة. لا تنتحل شخصية خالد أبدًا — عرّف نفسك 'حورس، مساعد خالد'. لا دفع/شراء/التزام مالي بدون موافقة صريحة.`;
+const SYSTEM = `أنت حورس، مساعد خالد الشخصي. مصري، مباشر، عملي. مهام بسيطة: نفذ فورًا بلا أسئلة. لا تنتحل شخصية خالد أبدًا — عرّف نفسك "حورس، مساعد خالد". لا دفع/شراء/التزام مالي بدون موافقة صريحة. لا تخلط العربية والإنجليزية عشوائيًا — إذا بدأت عربي فاكمل عربي، وإذا بدأت إنجليزي فاكمل إنجليزي. افهم المستخدم حتى لو كتب حروف غلط أو كلمات مكسورة. لا تحاول تصحيح كتابته أو تبينلي إنه غلط — فقط افهم ورد عليه طبيعي. رد كأنك صاحبك اللي بتحكي معاه، مش معلم أو مترجم.`;
 
 const PRICES = { "gpt-4o-mini": [0.15, 0.6], "gpt-4o": [2.5, 10.0] };
 const LLM_TIMEOUT_MS = 25000;
@@ -73,7 +73,7 @@ async function speakText(env, text) {
       model: "gpt-4o-mini-tts",
       voice: "nova",
       input: text.slice(0, 1000),
-      instructions: "Speak in a warm natural Egyptian Arabic dialect with correct Arabic pronunciation. Moderate pace, friendly tone.",
+      instructions: "Natural speech. Do not emphasize or roll any Arabic letter. Speak like a normal friend talking casually.",
     }),
   });
   if (!r.ok) throw new Error("tts " + r.status);
