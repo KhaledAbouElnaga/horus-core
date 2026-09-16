@@ -56,7 +56,12 @@ async function speakText(env, text) {
   const r = await fetch("https://api.openai.com/v1/audio/speech", {
     method: "POST",
     headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify({ model: "tts-1", voice: "nova", input: text.slice(0, 1000) }),
+    body: JSON.stringify({
+      model: "gpt-4o-mini-tts",
+      voice: "nova",
+      input: text.slice(0, 1000),
+      instructions: "Speak in a warm natural Egyptian Arabic dialect with correct Arabic pronunciation. Moderate pace, friendly tone.",
+    }),
   });
   if (!r.ok) throw new Error("tts " + r.status);
   return r.arrayBuffer();
@@ -117,7 +122,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (req.method === "GET" && url.pathname === "/health")
-      return Response.json({ ok: true, service: "horus-worker", v: "m4.1", voice: (await env.KV.get("voice:mode")) || env.VOICE_DEFAULT || "off" });
+      return Response.json({ ok: true, service: "horus-worker", v: "m4.2", voice: (await env.KV.get("voice:mode")) || env.VOICE_DEFAULT || "off" });
     if (req.method === "GET" && url.pathname === "/cost")
       return Response.json({ month_usd: Number((await env.KV.get("cost:month")) || 0), cap: 10 });
 
@@ -160,13 +165,13 @@ export default {
         await env.KV.put("facts:" + userId, JSON.stringify(facts.slice(-50)));
         return reply(env, chatId, "تمام، حفظتها ✅", "local", 0);
       }
-      if (/^(فاكر إيه|اظهر الذاكرة|\/memory|show memory)/.test(text)) {
+      if (/^(فاكر (إيه|ايه|أيه)|اظهر الذاكرة|\/memory|show memory)/.test(text)) {
         const facts = await jget(env, "facts:" + userId, []);
         if (!facts.length) return reply(env, chatId, "ذاكرتي فاضية لسه — قولي «افتكر أن ...».", "local", 0);
         return reply(env, chatId, "اللي فاكره عنك:\n" + facts.map((x, i) => `${i + 1}. ${x.f}`).join("\n").slice(0, 3500), "local", 0);
       }
       const factQuery = text.match(/^فاكر\s+(.+)/);
-      if (factQuery && !/^(فاكر إيه)/.test(text)) {
+      if (factQuery && !/^(فاكر (إيه|ايه|أيه))/.test(text)) {
         const facts = await jget(env, "facts:" + userId, []);
         const q = factQuery[1].replace(/[؟?]/g, "").trim();
         const hit = facts.find((x) => x.f.includes(q) || q.includes(x.f.slice(0, 10)));
