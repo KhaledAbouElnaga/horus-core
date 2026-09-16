@@ -53,6 +53,28 @@ async function testFreeFallbackToWorkersAI() {
   } finally { globalThis.fetch = oldFetch; }
 }
 
+async function testSambaNovaFallback() {
+  const oldFetch = globalThis.fetch;
+  try {
+    const urls = [];
+    globalThis.fetch = async (url, opts) => {
+      urls.push(url);
+      const body = JSON.parse(opts.body);
+      if (url.includes('groq')) return response({ error: { message: 'provider overloaded' } }, 503);
+      if (url.includes('sambanova')) {
+        assert.equal(body.model, 'Meta-Llama-3.3-70B-Instruct');
+        return response({ choices: [{ message: { content: 'ok from sambanova' } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
+      }
+      throw new Error('unexpected url ' + url);
+    };
+    const env = { GROQ_API_KEY: 'test-groq', SAMBANOVA_API_KEY: 'test-sambanova', PAID_LLM_MODE: 'off', KV: makeKV() };
+    const out = await llm(env, [{ role: 'user', content: 'hi' }], 'fast');
+    assert.equal(out.provider, 'sambanova');
+    assert.equal(out.cost, 0);
+    assert.ok(urls.some((u) => u.includes('api.sambanova.ai')));
+  } finally { globalThis.fetch = oldFetch; }
+}
+
 async function testPaidEmergencyOnlyWhenEnabled() {
   const oldFetch = globalThis.fetch;
   try {
@@ -95,14 +117,15 @@ function testClassification() {
 }
 
 function testCandidateOrder() {
-  const env = { GROQ_API_KEY: 'g', OPENAI_API_KEY: 'o', PAID_LLM_MODE: 'off', AI: {} };
+  const env = { GROQ_API_KEY: 'g', SAMBANOVA_API_KEY: 's', OPENAI_API_KEY: 'o', PAID_LLM_MODE: 'off', AI: {} };
   const c = buildCandidates(env, 'fast');
-  assert.deepEqual(c.map((x) => x.provider), ['groq', 'groq', 'workers_ai']);
+  assert.deepEqual(c.map((x) => x.provider), ['groq', 'groq', 'workers_ai', 'sambanova', 'sambanova']);
   assert.ok(c.every((x) => x.costClass !== 'paid_emergency'));
 }
 
 await testGroqSuccess();
 await testFreeFallbackToWorkersAI();
+await testSambaNovaFallback();
 await testPaidEmergencyOnlyWhenEnabled();
 await testPaidBlockedFailure();
 testClassification();

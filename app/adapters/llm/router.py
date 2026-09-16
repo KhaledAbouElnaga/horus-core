@@ -12,12 +12,16 @@ FREE_TIERS = {
     "fast": [
         {"provider": "groq", "model": "openai/gpt-oss-20b", "base_url": "https://api.groq.com/openai/v1"},
         {"provider": "groq", "model": "llama-3.1-8b-instant", "base_url": "https://api.groq.com/openai/v1"},
+        {"provider": "sambanova", "model": "Meta-Llama-3.3-70B-Instruct", "base_url": "https://api.sambanova.ai/v1"},
+        {"provider": "sambanova", "model": "DeepSeek-V3.1", "base_url": "https://api.sambanova.ai/v1"},
         {"provider": "gemini", "model": "gemini-2.5-flash-lite", "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/"},
         {"provider": "openrouter", "model": "openrouter/free", "base_url": "https://openrouter.ai/api/v1"},
     ],
     "strong": [
         {"provider": "groq", "model": "openai/gpt-oss-120b", "base_url": "https://api.groq.com/openai/v1"},
         {"provider": "groq", "model": "llama-3.3-70b-versatile", "base_url": "https://api.groq.com/openai/v1"},
+        {"provider": "sambanova", "model": "gpt-oss-120b", "base_url": "https://api.sambanova.ai/v1"},
+        {"provider": "sambanova", "model": "Meta-Llama-3.3-70B-Instruct", "base_url": "https://api.sambanova.ai/v1"},
         {"provider": "gemini", "model": "gemini-2.5-flash", "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/"},
         {"provider": "openrouter", "model": "openrouter/free", "base_url": "https://openrouter.ai/api/v1"},
     ],
@@ -48,6 +52,8 @@ def _cooldown(key: str, seconds: int) -> None:
 def _api_key(provider: str, settings: Any) -> str:
     if provider == "groq":
         return settings.groq_api_key
+    if provider == "sambanova":
+        return getattr(settings, "sambanova_api_key", "")
     if provider == "gemini":
         return getattr(settings, "gemini_api_key", "")
     if provider == "openrouter":

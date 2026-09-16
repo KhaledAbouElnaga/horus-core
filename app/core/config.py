@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     groq_api_key: str = ""
     gemini_api_key: str = ""
+    sambanova_api_key: str = ""
     openrouter_api_key: str = ""
     paid_llm_mode: str = "off"
     database_url: str = "sqlite+aiosqlite:///./horus.db"

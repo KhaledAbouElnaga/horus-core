@@ -15,18 +15,20 @@ Current deployed Worker: `https://horus-core.khaled-e-abouelnaga.workers.dev`
 1. Groq — `openai/gpt-oss-20b`
 2. Groq — `llama-3.1-8b-instant`
 3. Cloudflare Workers AI — `@cf/meta/llama-3.1-8b-instruct-fast`
-4. Gemini — `gemini-2.5-flash-lite`, dormant until `GEMINI_API_KEY` is added
-5. OpenRouter — `openrouter/free`, dormant until `OPENROUTER_API_KEY` is added
-6. OpenAI — `gpt-4o-mini`, paid emergency only, blocked while `PAID_LLM_MODE=off`
+4. SambaNova — `Meta-Llama-3.3-70B-Instruct`, `DeepSeek-V3.1`, dormant until `SAMBANOVA_API_KEY` is added
+5. Gemini — `gemini-2.5-flash-lite`, dormant until `GEMINI_API_KEY` is added
+6. OpenRouter — `openrouter/free`, dormant until `OPENROUTER_API_KEY` is added
+7. OpenAI — `gpt-4o-mini`, paid emergency only, blocked while `PAID_LLM_MODE=off`
 
 ### Tier order, strong
 
 1. Groq — `openai/gpt-oss-120b`
 2. Groq — `llama-3.3-70b-versatile`
 3. Cloudflare Workers AI — `@cf/meta/llama-3.1-8b-instruct-fast`
-4. Gemini — `gemini-2.5-flash`, dormant until `GEMINI_API_KEY` is added
-5. OpenRouter — `openrouter/free`, dormant until `OPENROUTER_API_KEY` is added
-6. OpenAI — `gpt-4o`, paid emergency only, blocked while `PAID_LLM_MODE=off`
+4. SambaNova — `gpt-oss-120b`, `Meta-Llama-3.3-70B-Instruct`, dormant until `SAMBANOVA_API_KEY` is added
+5. Gemini — `gemini-2.5-flash`, dormant until `GEMINI_API_KEY` is added
+6. OpenRouter — `openrouter/free`, dormant until `OPENROUTER_API_KEY` is added
+7. OpenAI — `gpt-4o`, paid emergency only, blocked while `PAID_LLM_MODE=off`
 
 ## Implemented provider status
 
@@ -34,6 +36,7 @@ Current deployed Worker: `https://horus-core.khaled-e-abouelnaga.workers.dev`
 |---|---:|---:|---|---|---|---|
 | GroqCloud | B | Yes | `openai/gpt-oss-20b`, `openai/gpt-oss-120b`, `llama-3.1-8b-instant`, `llama-3.3-70b-versatile` | OpenAI-compatible `/openai/v1/chat/completions` | Free tier has hard 429s. gpt-oss free example: 30 RPM, 1,000 RPD, 8K TPM, 200K TPD. No card unless upgraded. | PASS live remote self-test: `openai/gpt-oss-20b` returned `HORUS_LLM_OK` at cost 0. |
 | Cloudflare Workers AI | B | Yes | `@cf/meta/llama-3.1-8b-instruct-fast` | Worker AI binding + OpenAI-compatible REST exists | Free daily Neurons allocation. Avoid paid/frontier model IDs requiring paid billing/prepaid credits. | PASS live remote self-test: returned `HORUS_LLM_OK`; deprecated `@cf/meta/llama-3.1-8b-instruct` failed and was replaced. |
+| SambaNova Cloud | B | Dormant | `Meta-Llama-3.3-70B-Instruct`, `DeepSeek-V3.1`, `gpt-oss-120b` | OpenAI-compatible `/v1/chat/completions` | Free Tier with no payment method linked: 20 RPM, 20 RPD, 200k TPD per production model. | NOT TESTED: no key present. Human gate: create Free Tier key without linking payment method. |
 | Gemini API / AI Studio | B | Dormant | `gemini-2.5-flash-lite`, `gemini-2.5-flash` | OpenAI-compatible beta endpoint | Free tier available; billing required only for paid tiers. Free-tier data may be used to improve Google products. | NOT TESTED: no key present. Human gate: Khaled must create key without enabling billing. |
 | OpenRouter free router | C/D | Dormant | `openrouter/free` / `*:free` variants | OpenAI-compatible | Free variants: 20 RPM, 50 RPD for accounts with <$10 credits purchased. Free models depend on upstream availability; negative balance can block even free. | NOT TESTED: no key present. Human gate: create key, do not add credits/billing. |
 
@@ -99,7 +102,7 @@ To expand beyond the active two-provider chain, Khaled must manually create API 
 
 1. Gemini API free tier (`GEMINI_API_KEY`)
 2. OpenRouter free models (`OPENROUTER_API_KEY`)
-3. SambaNova Free Tier (future optional integration after key exists)
+3. SambaNova Free Tier (`SAMBANOVA_API_KEY`) — code is ready, key still needed
 4. Other candidates only after verifying no card/no billing in that account
 
 No provider requiring billing, card, paid credits, trial credits, or pay-as-you-go should be added to the active zero-cost chain.

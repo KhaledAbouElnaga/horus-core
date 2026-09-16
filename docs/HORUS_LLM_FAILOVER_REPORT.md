@@ -13,7 +13,7 @@ Current deployed policy:
 - OpenAI STT fallback and OpenAI TTS are blocked by default to prevent voice mode from creating charges.
 - Groq Free Tier is primary.
 - Cloudflare Workers AI free allocation is live fallback.
-- Gemini and OpenRouter are implemented as dormant optional free-tier fallbacks, activated only if Khaled adds keys without billing.
+- SambaNova, Gemini, and OpenRouter are implemented as dormant optional free-tier fallbacks, activated only if Khaled adds keys without billing/payment method.
 
 ## Totals
 
@@ -22,7 +22,7 @@ Current deployed policy:
 - Total genuinely free / hard-free / usable-free candidates found (A-D): 14
 - Total successfully configured in active production chain: 2 providers
 - Total live-tested working cloud models: 2
-- Total dormant optional providers in code: 2
+- Total dormant optional providers in code: 3
 - Total rejected / excluded from production chain: 11 providers
 - Total requiring human signup/API key before testing: at least 8
 
@@ -37,18 +37,20 @@ Fast/default tier:
 1. GroqCloud / `openai/gpt-oss-20b`
 2. GroqCloud / `llama-3.1-8b-instant`
 3. Cloudflare Workers AI / `@cf/meta/llama-3.1-8b-instruct-fast`
-4. Gemini API / `gemini-2.5-flash-lite` — dormant, needs key
-5. OpenRouter / `openrouter/free` — dormant, needs key
-6. OpenAI / `gpt-4o-mini` — paid emergency only, blocked while `PAID_LLM_MODE=off`
+4. SambaNova / `Meta-Llama-3.3-70B-Instruct`, then `DeepSeek-V3.1` — dormant, needs key
+5. Gemini API / `gemini-2.5-flash-lite` — dormant, needs key
+6. OpenRouter / `openrouter/free` — dormant, needs key
+7. OpenAI / `gpt-4o-mini` — paid emergency only, blocked while `PAID_LLM_MODE=off`
 
 Strong tier:
 
 1. GroqCloud / `openai/gpt-oss-120b`
 2. GroqCloud / `llama-3.3-70b-versatile`
 3. Cloudflare Workers AI / `@cf/meta/llama-3.1-8b-instruct-fast`
-4. Gemini API / `gemini-2.5-flash` — dormant, needs key
-5. OpenRouter / `openrouter/free` — dormant, needs key
-6. OpenAI / `gpt-4o` — paid emergency only, blocked while `PAID_LLM_MODE=off`
+4. SambaNova / `gpt-oss-120b`, then `Meta-Llama-3.3-70B-Instruct` — dormant, needs key
+5. Gemini API / `gemini-2.5-flash` — dormant, needs key
+6. OpenRouter / `openrouter/free` — dormant, needs key
+7. OpenAI / `gpt-4o` — paid emergency only, blocked while `PAID_LLM_MODE=off`
 
 ## Working providers
 
@@ -61,6 +63,7 @@ Strong tier:
 
 | Provider | Model(s) | Why dormant |
 |---|---|---|
+| SambaNova Cloud | `Meta-Llama-3.3-70B-Instruct`, `DeepSeek-V3.1`, `gpt-oss-120b` | Needs `SAMBANOVA_API_KEY`; user must create Free Tier key without linking payment method. |
 | Gemini API | `gemini-2.5-flash-lite`, `gemini-2.5-flash` | Needs `GEMINI_API_KEY`; user must create key without enabling billing. |
 | OpenRouter | `openrouter/free` | Needs `OPENROUTER_API_KEY`; low 50 RPD free limit and upstream variability. |
 
@@ -174,9 +177,9 @@ No billing/card action was taken.
 
 If Khaled wants more free diversity, the next safe gates are:
 
-1. Create Gemini API key in Google AI Studio without enabling billing.
-2. Create OpenRouter API key without buying credits and use only `:free`/`openrouter/free`.
-3. Create SambaNova Free Tier key without payment method.
+1. Create SambaNova Free Tier key without linking a payment method.
+2. Create Gemini API key in Google AI Studio without enabling billing.
+3. Create OpenRouter API key without buying credits and use only `:free`/`openrouter/free`.
 4. Optionally test Hyperbolic/Novita only after confirming account can call free models with no billing/payment method.
 
 ## Files changed

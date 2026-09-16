@@ -11,6 +11,7 @@ const PAID_LLM_EMERGENCY = "emergency";
 const FREE_PROVIDER_NOTES = {
   groq: "Groq Free tier: no billing unless account is upgraded; hard 429 limits.",
   workers_ai: "Cloudflare Workers AI free daily allocation; avoid paid/frontier models.",
+  sambanova: "SambaNova Free Tier: no payment method linked; 20 RPD/model hard quota.",
   gemini: "Gemini API free tier; requires user-provided key and no billing upgrade.",
   openrouter: "OpenRouter :free models; low free limits and upstream availability vary.",
 };
@@ -182,6 +183,10 @@ function buildCandidates(env, tier) {
     candidates.push({ provider: "workers_ai", model: "@cf/meta/llama-3.1-8b-instruct-fast", costClass: "free", quality: "emergency" });
   }
 
+  if (env.SAMBANOVA_API_KEY) {
+    candidates.push({ provider: "sambanova", model: strong ? "gpt-oss-120b" : "Meta-Llama-3.3-70B-Instruct", baseUrl: "https://api.sambanova.ai/v1/chat/completions", key: env.SAMBANOVA_API_KEY, costClass: "free_tier", quality: strong ? "strong" : "fallback" });
+    candidates.push({ provider: "sambanova", model: "DeepSeek-V3.1", baseUrl: "https://api.sambanova.ai/v1/chat/completions", key: env.SAMBANOVA_API_KEY, costClass: "free_tier", quality: "fallback" });
+  }
   if (env.GEMINI_API_KEY) {
     candidates.push({ provider: "gemini", model: strong ? "gemini-2.5-flash" : "gemini-2.5-flash-lite", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", key: env.GEMINI_API_KEY, costClass: "free_tier", quality: strong ? "strong" : "fast" });
   }
