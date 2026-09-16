@@ -17,6 +17,51 @@ async function jget(env, key, fallback) {
   catch { return fallback; }
 }
 
+// M4: صوت داخل (ملف صوتي → نص عبر Groq Whisper) وصوت خارج (نص → صوت عبر OpenAI TTS)
+async function tgSendVoice(env, chatId, audioBytes) {
+  const form = new FormData();
+  form.append("chat_id", chatId);
+  form.append("voice", new Blob([audioBytes], { type: "audio/mpeg" }), "reply.mp3");
+  const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendVoice`, { method: "POST", body: form });
+  return r.json();
+}
+
+async function transcribeVoice(env, fileId) {
+  const info = await tg(env, "getFile", { file_id: fileId });
+  const path = info?.result?.file_path;
+  if (!path) throw new Error("no file");
+  const audio = await (await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${path}`)).arrayBuffer();
+  const form = new FormData();
+  form.append("file", new Blob([audio], { type: "audio/ogg" }), "voice.ogg");
+  if (env.GROQ_API_KEY) {
+    form.append("model", "whisper-large-v3-turbo");
+    form.append("language", "ar");
+    form.append("response_format", "text");
+    const r = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+      method: "POST", headers: { authorization: `Bearer ${env.GROQ_API_KEY}` }, body: form,
+    });
+    if (!r.ok) throw new Error("groq stt " + r.status);
+    return (await r.text()).trim();
+  }
+  form.append("model", "whisper-1");
+  form.append("language", "ar");
+  const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}` }, body: form,
+  });
+  if (!r.ok) throw new Error("openai stt " + r.status);
+  return ((await r.json()).text || "").trim();
+}
+
+async function speakText(env, text) {
+  const r = await fetch("https://api.openai.com/v1/audio/speech", {
+    method: "POST",
+    headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
+    body: JSON.stringify({ model: "tts-1", voice: "nova", input: text.slice(0, 1000) }),
+  });
+  if (!r.ok) throw new Error("tts " + r.status);
+  return r.arrayBuffer();
+}
+
 // M3: بيانات حية مجانية بلا مفاتيح (Open-Meteo للطقس + ويكيبيديا للمعرفة)
 async function liveWeather(city) {
   const cities = { "القاهرة": "القاهرة", "الجيزة": "الجيزة", "الإسكندرية": "الإسكندرية", "اسكندرية": "الإسكندرية", "أسوان": "أسوان", "الأقصر": "الأقصر", "شرم الشيخ": "شرم الشيخ", "الغردقة": "الغردقة", "بورسعيد": "بورسعيد", "السويس": "السويس", "المنصورة": "المنصورة", "طنطا": "طنطا", "أسيوط": "أسيوط", "دبي": "دبي", "الرياض": "الرياض", "جدة": "جدة" };
@@ -72,7 +117,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (req.method === "GET" && url.pathname === "/health")
-      return Response.json({ ok: true, service: "horus-worker", v: "m3.2", voice: (await env.KV.get("voice:mode")) || env.VOICE_DEFAULT || "off" });
+      return Response.json({ ok: true, service: "horus-worker", v: "m4.1", voice: (await env.KV.get("voice:mode")) || env.VOICE_DEFAULT || "off" });
     if (req.method === "GET" && url.pathname === "/cost")
       return Response.json({ month_usd: Number((await env.KV.get("cost:month")) || 0), cap: 10 });
 
@@ -81,15 +126,27 @@ export default {
       const msg = data.message || {};
       const chatId = String((msg.chat || {}).id || "");
       const userId = String(((msg.from || {}).id || ""));
-      const text = (msg.text || "").trim();
+      let text = (msg.text || "").trim();
+      let fromVoice = false;
+      if (!text && msg.voice) {
+        try {
+          text = await transcribeVoice(env, msg.voice.file_id);
+          fromVoice = true;
+          if (!text) return reply(env, chatId, "سمعتك بس مفهمتش الكلام — جرّب تاني بصوت أوضح.", "error", 0);
+        } catch {
+          return reply(env, chatId, "معرفتش أحوّل الصوت لنص دلوقتي — جرّب بعد شوية.", "error", 0);
+        }
+      }
+      if (!text) return Response.json({ ok: true, skipped: "non-text (files/photos)" });
+      let forceVoice = /رد (عليّا|عليا|علي|عليه|لي)? ?بصوت/.test(text);
+      text = text.replace(/رد (عليّا|عليا|علي|عليه|لي)? ?بصوت/g, "").trim();
       const allowed = (env.ALLOWED_USER_IDS || "").split(",").map((s) => s.trim());
       if (!chatId || (allowed.length && !allowed.includes(userId))) return Response.json({ ok: false });
-      if (!text) return Response.json({ ok: true, skipped: "non-text (M4)" });
 
       // أوامر محلية بلا LLM
       if (text === "/voice status" || text === "/voice")
         return reply(env, chatId, "وضع الصوت: " + ((await env.KV.get("voice:mode")) || "off"), "local", 0);
-      if (text === "/voice on" || text === "رد علي بصوت") { await env.KV.put("voice:mode", "on"); return reply(env, chatId, "تمام، من دلوقتي هرد بصوت 🎙️ (تفعيل كامل في M4)", "local", 0); }
+      if (text === "/voice on" || text === "رد علي بصوت") { await env.KV.put("voice:mode", "on"); return reply(env, chatId, "تمام، من دلوقتي هرد بصوت 🎙️", "local", 0); }
       if (text === "/voice off") { await env.KV.put("voice:mode", "off"); return reply(env, chatId, "تمام، هرجع نص بس.", "local", 0); }
       if (text === "/start" || text === "/help" || text === "مساعدة")
         return reply(env, chatId, "أنا حورس، مساعدك الشخصي 🤖\n\nكلمني عادي نصًا، أو جرّب:\n• افتكر أن ... — أحفظ معلومة\n• فاكر إيه؟ — أعرض ذاكرتي\n• انسى ... — أمسح معلومة\n• مهمة: ... — أسجّل مهمة\n• /tasks — المهام الشغالة\n• /voice on|off — الرد الصوتي", "local", 0);
@@ -156,7 +213,7 @@ export default {
         const hit = cityKeys.find((k) => text.includes(k));
         try {
           const w = await liveWeather(hit || "القاهرة");
-          if (w) return reply(env, chatId, w + " 🌡️ (بيانات حية)", "live", 0);
+          if (w) return reply(env, chatId, w + " 🌡️ (بيانات حية)", "live", 0, forceVoice || fromVoice);
         } catch {}
         return reply(env, chatId, "معرفتش أجيب الطقس دلوقتي — جرّب بعد شوية.", "error", 0);
       }
@@ -164,7 +221,7 @@ export default {
       if (wikiQ) {
         try {
           const s = await liveWiki(wikiQ[1].replace(/^(هو|هي|ده|دي)\s+/, "").trim());
-          if (s) return reply(env, chatId, s, "live", 0);
+          if (s) return reply(env, chatId, s, "live", 0, forceVoice || fromVoice);
         } catch {}
       }
       // سياق قصير + حقائق دائمة من KV
@@ -179,7 +236,7 @@ export default {
         await env.KV.put("ctx:" + userId, JSON.stringify(ctx.slice(-10)), { expirationTtl: 86400 * 7 });
         const total = Number((await env.KV.get("cost:month")) || 0) + cost;
         await env.KV.put("cost:month", String(total));
-        return reply(env, chatId, out.slice(0, 4000), model, cost);
+        return reply(env, chatId, out.slice(0, 4000), model, cost, forceVoice || fromVoice);
       } catch (e) {
         return reply(env, chatId, "عطل مؤقت في عقل الذكاء — جرّب تاني كمان شوية.", "error", 0);
       }
@@ -188,7 +245,13 @@ export default {
   },
 };
 
-async function reply(env, chatId, text, model, cost) {
+async function reply(env, chatId, text, model, cost, forceVoice) {
   await tg(env, "sendMessage", { chat_id: chatId, text });
+  try {
+    const mode = await env.KV.get("voice:mode");
+    if ((mode === "on" || forceVoice) && model !== "error" && text.length < 1500) {
+      await tgSendVoice(env, chatId, await speakText(env, text));
+    }
+  } catch {}
   return Response.json({ ok: true, model, cost });
 }
