@@ -12,6 +12,11 @@ async function tg(env, method, payload) {
   return r.json();
 }
 
+async function jget(env, key, fallback) {
+  try { return JSON.parse((await env.KV.get(key)) || JSON.stringify(fallback)); }
+  catch { return fallback; }
+}
+
 async function llm(env, messages, tier) {
   const primary = tier === "strong" ? "gpt-4o" : "gpt-4o-mini";
   const fallback = tier === "strong" ? "llama-3.3-70b-versatile" : "llama-3.1-8b-instant";
@@ -44,7 +49,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (req.method === "GET" && url.pathname === "/health")
-      return Response.json({ ok: true, service: "horus-worker", voice: (await env.KV.get("voice:mode")) || env.VOICE_DEFAULT || "off" });
+      return Response.json({ ok: true, service: "horus-worker", v: "m2.5", voice: (await env.KV.get("voice:mode")) || env.VOICE_DEFAULT || "off" });
     if (req.method === "GET" && url.pathname === "/cost")
       return Response.json({ month_usd: Number((await env.KV.get("cost:month")) || 0), cap: 10 });
 
@@ -63,16 +68,73 @@ export default {
         return reply(env, chatId, "وضع الصوت: " + ((await env.KV.get("voice:mode")) || "off"), "local", 0);
       if (text === "/voice on" || text === "رد علي بصوت") { await env.KV.put("voice:mode", "on"); return reply(env, chatId, "تمام، من دلوقتي هرد بصوت 🎙️ (تفعيل كامل في M4)", "local", 0); }
       if (text === "/voice off") { await env.KV.put("voice:mode", "off"); return reply(env, chatId, "تمام، هرجع نص بس.", "local", 0); }
+      if (text === "/start" || text === "/help" || text === "مساعدة")
+        return reply(env, chatId, "أنا حورس، مساعدك الشخصي 🤖\n\nكلمني عادي نصًا، أو جرّب:\n• افتكر أن ... — أحفظ معلومة\n• فاكر إيه؟ — أعرض ذاكرتي\n• انسى ... — أمسح معلومة\n• مهمة: ... — أسجّل مهمة\n• /tasks — المهام الشغالة\n• /voice on|off — الرد الصوتي", "local", 0);
       if (text === "/status" || text === "status" || text === "صحتك؟")
         return reply(env, chatId, "حورس شغال ✅ — سحابي 24/7 — الصوت: " + ((await env.KV.get("voice:mode")) || "off"), "local", 0);
+      // ذاكرة دائمة: افتكر / فاكر إيه / انسى
+      const remember = text.match(/^(?:ا?فتكر|احفظ|خليك فاكر|متنساش)(?:\s+أ?ن)?\s*[:：]?\s*(.+)/);
+      if (remember) {
+        const facts = await jget(env, "facts:" + userId, []);
+        facts.push({ f: remember[1].slice(0, 300), ts: Date.now() });
+        await env.KV.put("facts:" + userId, JSON.stringify(facts.slice(-50)));
+        return reply(env, chatId, "تمام، حفظتها ✅", "local", 0);
+      }
+      if (/^(فاكر إيه|اظهر الذاكرة|\/memory|show memory)/.test(text)) {
+        const facts = await jget(env, "facts:" + userId, []);
+        if (!facts.length) return reply(env, chatId, "ذاكرتي فاضية لسه — قولي «افتكر أن ...».", "local", 0);
+        return reply(env, chatId, "اللي فاكره عنك:\n" + facts.map((x, i) => `${i + 1}. ${x.f}`).join("\n").slice(0, 3500), "local", 0);
+      }
+      const factQuery = text.match(/^فاكر\s+(.+)/);
+      if (factQuery && !/^(فاكر إيه)/.test(text)) {
+        const facts = await jget(env, "facts:" + userId, []);
+        const q = factQuery[1].replace(/[؟?]/g, "").trim();
+        const hit = facts.find((x) => x.f.includes(q) || q.includes(x.f.slice(0, 10)));
+        return reply(env, chatId, hit ? `أيوه فاكر ✅: ${hit.f}` : "لأ، مش فاكر حاجة عن ده.", "local", 0);
+      }
+      const forgetFact = text.match(/^(?:انسى|امسح من الذاكرة|forget)\s+(.+)/);
+      if (forgetFact && !text.startsWith("/forget ")) {
+        const facts = await jget(env, "facts:" + userId, []);
+        const q = forgetFact[1].trim();
+        const kept = facts.filter((x) => !x.f.includes(q));
+        await env.KV.put("facts:" + userId, JSON.stringify(kept));
+        return reply(env, chatId, facts.length === kept.length ? "ملقتش حاجة بالاسم ده." : "نسيتها ✅", "local", 0);
+      }
       if (text.startsWith("/forget ")) { await env.KV.delete("ctx:" + userId); return reply(env, chatId, "نسيت سياق المحادثة.", "local", 0); }
+      // مهام: مهمة: / tasks / done / cancel
+      const newTask = text.match(/^(?:مهمة|مهمه|مهمة جديدة|task)\s*[:：]?\s*(.+)/);
+      if (newTask) {
+        const tasks = await jget(env, "tasks:" + userId, []);
+        const id = "T-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+        tasks.push({ id, title: newTask[1].slice(0, 200), status: "RUNNING", ts: Date.now() });
+        await env.KV.put("tasks:" + userId, JSON.stringify(tasks.slice(-30)));
+        return reply(env, chatId, `سجّلتها ✅ ${id}: ${newTask[1].slice(0, 100)}`, "local", 0);
+      }
+      if (/^(\/tasks|المهام|إيه المهام الشغالة)/.test(text)) {
+        const tasks = (await jget(env, "tasks:" + userId, [])).filter((t) => t.status === "RUNNING");
+        if (!tasks.length) return reply(env, chatId, "مفيش مهام شغالة حاليًا.", "local", 0);
+        return reply(env, chatId, tasks.map((t) => `${t.id}: ${t.title}`).join("\n"), "local", 0);
+      }
+      const taskDone = text.match(/^(?:خلصت|done|قفل)\s+(T-[A-Z0-9]{4})/i);
+      const taskCancel = text.match(/^(?:الغي|إلغي|cancel)\s+(T-[A-Z0-9]{4})/i);
+      if (taskDone || taskCancel) {
+        const id = (taskDone || taskCancel)[1].toUpperCase();
+        const tasks = await jget(env, "tasks:" + userId, []);
+        const t = tasks.find((x) => x.id === id);
+        if (!t) return reply(env, chatId, "ملقتش المهمة دي.", "local", 0);
+        t.status = taskDone ? "COMPLETED" : "CANCELLED";
+        await env.KV.put("tasks:" + userId, JSON.stringify(tasks));
+        return reply(env, chatId, taskDone ? `عاش ✅ ${id} اتقفلت.` : `${id} اتلغت.`, "local", 0);
+      }
 
-      // سياق قصير من KV
+      // سياق قصير + حقائق دائمة من KV
       let ctx = [];
       try { ctx = JSON.parse((await env.KV.get("ctx:" + userId)) || "[]"); } catch {}
+      const facts = await jget(env, "facts:" + userId, []);
+      const factTxt = facts.length ? "\nحقائق ثابتة عن خالد:\n" + facts.map((x) => "- " + x.f).join("\n") : "";
       const tier = text.length > 400 || /خطة|قارن|احجز|اتصل/.test(text) ? "strong" : "fast";
       try {
-        const { text: out, model, cost } = await llm(env, [{ role: "system", content: SYSTEM }, ...ctx.slice(-10), { role: "user", content: text }], tier);
+        const { text: out, model, cost } = await llm(env, [{ role: "system", content: SYSTEM + factTxt }, ...ctx.slice(-10), { role: "user", content: text }], tier);
         ctx.push({ role: "user", content: text.slice(0, 500) }, { role: "assistant", content: out.slice(0, 500) });
         await env.KV.put("ctx:" + userId, JSON.stringify(ctx.slice(-10)), { expirationTtl: 86400 * 7 });
         const total = Number((await env.KV.get("cost:month")) || 0) + cost;
